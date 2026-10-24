@@ -1,3 +1,7 @@
+/*! Copyright (c) 2026 Ikhwan Arief (ikhwan[at]eng.unand.ac.id). All rights reserved.
+ * Licensed under the PolyForm Noncommercial License 1.0.0
+ * (https://polyformproject.org/licenses/noncommercial/1.0.0). Commercial use requires prior
+ * written permission from the copyright holder. See LICENSE and NOTICE. */
 import {csvCell, INSTITUTION} from './metrics.js';
 export const PALETTE = ['#28745B', '#B8934A', '#368C88', '#587AA5', '#8A7098', '#9BAE96', '#49705F', '#C4AB76', '#7F9DAD', '#B3A6B8'];
 export const OA_COLORS = { diamond: '#28745B', gold: '#B8934A', hybrid: '#587AA5', green: '#7DA286', bronze: '#A57D54', closed: '#ADB5AD', unknown: '#DBDFDA' };

@@ -1,11 +1,11 @@
 # Research publication dashboard: Universitas Pendidikan Ganesha
 
-**[Open the public dashboard](https://ikhwan-arief.github.io/dash_undiksha/)**. No GitHub account is needed.
+**[Open the dashboard](https://ikhwan-arief.github.io/dash_undiksha/)**. No account is needed.
 
-This repository holds only the static site and its GitHub Pages workflow. Development, OpenAlex data collection, tests and credentials live in a separate private repository.
+The dashboard presents the publications, citation impact, collaboration, topics, SDGs and openness of Universitas Pendidikan Ganesha, from public OpenAlex metadata. The snapshot is refreshed weekly; the date of the current snapshot is shown on the dashboard and in `data/manifest.json`. If a refresh fails, the last good version stays online.
 
-The snapshot is refreshed weekly. The actual refresh time is shown on the dashboard and in `data/manifest.json`. If a refresh fails, the site keeps the last successful deployment.
-
-This is an independent dashboard built on public OpenAlex metadata. It is not an endorsed official statistic of Universitas Pendidikan Ganesha. OpenAlex metadata is CC0; document rights follow their own licenses. Charts and data delivered to the browser are publicly accessible.
+This is an independent dashboard built on public OpenAlex metadata. It is not an endorsed official statistic of Universitas Pendidikan Ganesha. OpenAlex metadata is CC0; rights to the works it describes belong to their respective holders.
 
 Compiled and developed by **Ikhwan Arief**.
+
+Copyright © 2026 Ikhwan Arief. The code is licensed under the PolyForm Noncommercial License 1.0.0; commercial use requires the copyright holder's written permission. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

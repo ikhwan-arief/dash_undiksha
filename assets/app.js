@@ -1,3 +1,7 @@
+/*! Copyright (c) 2026 Ikhwan Arief (ikhwan[at]eng.unand.ac.id). All rights reserved.
+ * Licensed under the PolyForm Noncommercial License 1.0.0
+ * (https://polyformproject.org/licenses/noncommercial/1.0.0). Commercial use requires prior
+ * written permission from the copyright holder. See LICENSE and NOTICE. */
 import { MODULES, SDGS, METRIC_KINDS, INSTITUTION, configureInstitution, csvCell, metricDrill, journalWindow, snapshotYearOf, withoutPeriod, workSdgs, citingShard, CITING_FIELDS } from './metrics.js';
 import { renderImpactMetrics, renderJournalRecap, renderJournalHeader, renderJournalMetrics, renderJournalCitations, renderJournalTable, METRIC_TITLES, metricYear } from './journal-panel.js';
 import { EXPORT_CONTROLS, SHOW_AUDIT_TAB, CONTENT_PROTECTION } from './config.js';
@@ -1145,13 +1149,17 @@ async function init() {
         document.addEventListener('contextmenu', event => {
             if (!event.target.closest('input,textarea,select,[contenteditable="true"]')) event.preventDefault();
         });
+        // Copying and cutting page content is blocked; form fields (search, filters) keep normal editing.
+        for (const type of ['copy', 'cut']) document.addEventListener(type, event => {
+            if (!event.target.closest?.('input,textarea,select,[contenteditable="true"]')) event.preventDefault();
+        });
         document.addEventListener('dragstart', event => {
             if (event.target.closest('img,svg,canvas')) event.preventDefault();
         });
         document.addEventListener('keydown', event => {
-            if ((event.ctrlKey || event.metaKey) && !event.altKey && ['s', 'p'].includes(event.key.toLowerCase())) {
+            if ((event.ctrlKey || event.metaKey) && !event.altKey && ['s', 'p', 'u'].includes(event.key.toLowerCase())) {
                 event.preventDefault();
-                note('Save and print shortcuts are disabled on this dashboard.');
+                note('Save, print and view-source shortcuts are disabled on this dashboard.');
             }
         });
     }

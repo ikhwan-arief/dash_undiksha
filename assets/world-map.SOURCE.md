@@ -16,3 +16,7 @@ python3 scripts/prepare_world_map.py
 ```
 
 The dashboard counts come from the OpenAlex snapshot. Natural Earth supplies geography only.
+
+---
+
+Copyright (c) 2026 Ikhwan Arief (ikhwan[at]eng.unand.ac.id). All rights reserved. Licensed under the PolyForm Noncommercial License 1.0.0 (https://polyformproject.org/licenses/noncommercial/1.0.0). Commercial use requires prior written permission from the copyright holder. See LICENSE and NOTICE.
