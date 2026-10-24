@@ -2,7 +2,7 @@
  * Licensed under the PolyForm Noncommercial License 1.0.0
  * (https://polyformproject.org/licenses/noncommercial/1.0.0). Commercial use requires prior
  * written permission from the copyright holder. See LICENSE and NOTICE. */
-import { MODULES, SDGS, METRIC_KINDS, INSTITUTION, configureInstitution, csvCell, metricDrill, journalWindow, snapshotYearOf, withoutPeriod, workSdgs, citingShard, CITING_FIELDS } from './metrics.js';
+import { MODULES, SDGS, METRIC_KINDS, INSTITUTION, configureInstitution, languageName, csvCell, metricDrill, journalWindow, snapshotYearOf, withoutPeriod, workSdgs, citingShard, CITING_FIELDS } from './metrics.js';
 import { renderImpactMetrics, renderJournalRecap, renderJournalHeader, renderAuthorHeader, renderJournalMetrics, renderJournalCitations, renderJournalTable, METRIC_TITLES, metricYear } from './journal-panel.js';
 import { EXPORT_CONTROLS, SHOW_AUDIT_TAB, CONTENT_PROTECTION } from './config.js';
 import { el, panel, bar, line, donut, stacked, scatter, heatmap, treemap, network, dots, smallMultiples, countryBubbleMap, destroyCharts, downloadText, PALETTE, applyTheme } from './charts.js';
@@ -175,7 +175,7 @@ function syncFilters() {
     $('filter-scope').disabled = $('filter-corpus').disabled = journalPage() || authorPage();
     for (const [key, label] of Object.entries(labels))
         if (filter[key] !== undefined && filter[key] !== '' && !(key === 'source' && journalPage()) && !(key === 'author' && authorPage())) {
-            const chip = el('span', { class: 'chip' }, `${label}: ${filter[key]}`), button = el('button', { type: 'button', 'aria-label': `Remove filter ${label}` }, '×');
+            const chip = el('span', { class: 'chip' }, `${label}: ${key === 'language' ? languageName(filter[key]) : filter[key]}`), button = el('button', { type: 'button', 'aria-label': `Remove filter ${label}` }, '×');
             button.onclick = () => { const next = { ...filter }; delete next[key]; setHash(currentModule, next); };
             chip.append(button);
             $('active-filters').append(chip);
@@ -1223,9 +1223,8 @@ async function init() {
     document.querySelector('.skip-link').onclick = event => {event.preventDefault();$('main').focus();$('main').scrollIntoView();};
     // Built after the manifest arrives: the Journals tab exists only when the institution has a publisher role.
     const buildNav = () => MODULES.forEach(([id, label, number], i) => { if (!moduleEnabled(id)) return; const a = el('a', { href: '#' + id, class: 'nav-link', 'data-module': id }); a.append(el('span', { class: 'nav-number', 'aria-hidden': 'true' }, icons[i]), el('span', {}, label)); a.onclick = e => { e.preventDefault(); if (!manifest)
-        return; document.querySelector('.sidebar').classList.remove('open'); $('menu-toggle').setAttribute('aria-expanded', 'false'); const next = moduleDefaults(id); for (const k of ['from', 'to', 'type', 'field', 'corpus', 'oa'])
-        if (filter[k] && !(k === 'corpus' && (filter.journal || filter.corpus === defaultCorpus(currentModule))))
-            next[k] = filter[k]; setHash(id, next); }; $('navigation').append(a); });
+        return; document.querySelector('.sidebar').classList.remove('open'); $('menu-toggle').setAttribute('aria-expanded', 'false'); // Every tab opens clean: its own default filters, nothing carried over (same as Reset all filters).
+        topicGroup = ''; topicSubfield = ''; const previousHash = location.hash; setHash(id, moduleDefaults(id)); if (location.hash === previousHash) route(); }; $('navigation').append(a); });
     $('filters-form').onsubmit = e => { e.preventDefault(); if (!manifest)
         return; const next = { ...filter }; delete next.metricKind; delete next.metricPart; for (const [k, v] of new FormData(e.currentTarget))
         next[k] = v; setHash(currentModule, next); };

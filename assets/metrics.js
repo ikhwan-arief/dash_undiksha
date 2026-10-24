@@ -215,6 +215,13 @@ export function journalWidgetData(journal, works, entities, manifest, dataset) {
         sdgs: summary.top.sdgs.filter(r => /^(?:[1-9]|1[0-7])$/.test(r.id)).map(r => [Number(r.id), r.count]),
         sdg_policy: { classifier: manifest.sdg?.classifier || 'unknown', scores: Boolean(manifest.sdg?.scores) } };
 }
+// Language codes from OpenAlex (ISO 639-1, e.g. "id") shown as English names ("Indonesian"); the code stays the filter ID.
+const LANGUAGES = (() => { try { return new Intl.DisplayNames(['en'], { type: 'language' }); } catch { return null; } })();
+export function languageName(code) {
+    if (!code || code === 'unknown') return 'Unknown';
+    if (!/^[a-z]{2,3}$/i.test(code)) return code;
+    try { const name = LANGUAGES?.of(code); return name && name !== code ? name : code; } catch { return code; }
+}
 // One author's identity (OpenAlex profile, all affiliations) and roles on the given works.
 // eligible: the author has an affiliated authorship anywhere in the snapshot (all works), whatever the active filter.
 export function authorProfile(works, entities, id, everything = works) {
@@ -561,7 +568,7 @@ export function summarize(works, entities, filter, manifest, history = [], table
         corresponding += hasCorresponding ? 1 : 0;
         add('years', work.year || 'unknown', work.year || 'Unknown', work);
         add('types', work.type, work.type, work);
-        add('languages', work.language, work.language, work);
+        add('languages', work.language, languageName(work.language), work);
         add('fields', work.field, name('field', work.field), work);
         for (const topic of new Set(work.topics?.length ? work.topics : [work.topic || 'unknown'])) add('topics', topic, name('topics',topic),work);
         add('oa', work.oa_status, work.oa_status, work);

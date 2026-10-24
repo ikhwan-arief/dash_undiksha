@@ -350,8 +350,10 @@ export function treemap(p, allRows, onClick) {
         return;
     }
     p.body.classList.add('tall');
-    const svg = svgEl('svg', { viewBox: '0 0 800 340', role: 'img', 'aria-label': p.title, xmlns: NS });
-    const fontSize = Math.max(16, Math.min(32, 800 / Math.max(280, p.body.clientWidth) * 12));
+    // Drawn at the box's real size (1 unit = 1 px), so tiles fill the full width and labels keep a readable size.
+    const W = Math.max(280, Math.round(p.body.clientWidth || 800)), H = Math.max(220, Math.round(p.body.clientHeight || 340));
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': p.title, xmlns: NS });
+    const fontSize = W < 520 ? 12 : 14;
     function divide(items, x, y, w, h) {
         if (items.length === 1) {
             const row = items[0], i = rows.indexOf(row), g = svgEl('g', { class: 'treemap-tile', tabindex: '0', role: 'button', 'aria-label': `${row.name}: ${row.count} works` });
@@ -361,7 +363,7 @@ export function treemap(p, allRows, onClick) {
                 const max = Math.max(3, Math.floor((w - 20) / (fontSize * .58))), fill = ink(colorFor(row.id, i));
                 g.append(svgEl('text', { x: x + 10, y: y + fontSize + 8, fill, 'font-size': fontSize, 'font-family': 'system-ui' }, row.name.length > max ? row.name.slice(0, max - 1) + '…' : row.name));
                 if (h > fontSize * 2 + 22)
-                    g.append(svgEl('text', { x: x + 10, y: y + fontSize * 2 + 22, fill, 'font-size': fontSize + 8, 'font-family': 'system-ui' }, integer.format(row.count)));
+                    g.append(svgEl('text', { x: x + 10, y: y + fontSize * 2 + 16, fill, 'font-size': fontSize + 6, 'font-weight': 600, 'font-family': 'system-ui' }, integer.format(row.count)));
             }
             const activate = () => row.id && onClick?.(row);
             g.onclick = activate;
@@ -386,7 +388,7 @@ export function treemap(p, allRows, onClick) {
             divide(items.slice(index), x, y + h * part, w, h * (1 - part));
         }
     }
-    divide(rows, 0, 0, 800, 340);
+    divide(rows, 0, 0, W, H);
     p.body.append(svg);
     exportControl(p);
     accessible(p, allRows, onClick);
