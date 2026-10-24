@@ -3,7 +3,7 @@
  * (https://polyformproject.org/licenses/noncommercial/1.0.0). Commercial use requires prior
  * written permission from the copyright holder. See LICENSE and NOTICE. */
 import { MODULES, SDGS, METRIC_KINDS, INSTITUTION, configureInstitution, csvCell, metricDrill, journalWindow, snapshotYearOf, withoutPeriod, workSdgs, citingShard, CITING_FIELDS } from './metrics.js';
-import { renderImpactMetrics, renderJournalRecap, renderJournalHeader, renderJournalMetrics, renderJournalCitations, renderJournalTable, METRIC_TITLES, metricYear } from './journal-panel.js';
+import { renderImpactMetrics, renderJournalRecap, renderJournalHeader, renderAuthorHeader, renderJournalMetrics, renderJournalCitations, renderJournalTable, METRIC_TITLES, metricYear } from './journal-panel.js';
 import { EXPORT_CONTROLS, SHOW_AUDIT_TAB, CONTENT_PROTECTION } from './config.js';
 import { el, panel, bar, line, donut, stacked, scatter, heatmap, treemap, network, dots, smallMultiples, countryBubbleMap, destroyCharts, downloadText, PALETTE, applyTheme } from './charts.js';
 const $ = id => document.getElementById(id), nf = new Intl.NumberFormat('en-US'), df = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
@@ -79,9 +79,13 @@ function setHash(module, next = filter) { const p = new URLSearchParams(); for (
     location.hash = hash; }
 const journalPage = () => currentModule === 'journals' && Boolean(filter.journal);
 const currentJournal = () => journalPage() ? journalDataset?.journals.find(j => j.id === filter.journal) : null;
-// Drills stay inside a journal page; on the journals overview one of the institution's journals opens its own page.
+// Author profile page (#authors?author=A…): every work in the snapshot that lists the author.
+const authorPage = () => currentModule === 'authors' && Boolean(filter.author);
+const openAuthor = (author, extra = {}) => setHash('authors', { author, ...extra });
+// Drills stay inside a journal or author page; on the journals overview one of the institution's journals opens its own page.
 function drill(patch) {
     if (journalPage()) return setHash('journals', { ...filter, ...patch });
+    if (authorPage()) return setHash('authors', { ...filter, ...patch });
     if (currentModule === 'journals' && patch.source && journalDataset?.journals.some(j => j.id === patch.source)) {
         const { source, ...rest } = patch;
         return setHash('journals', { journal: source, ...rest });
@@ -105,6 +109,8 @@ function readRoute() {
     // A journal page has one fixed population: works published by that journal, full corpus.
     if (currentModule === 'journals' && filter.journal) Object.assign(filter, { scope: 'published', corpus: 'all', source: filter.journal });
     else delete filter.journal;
+    // An author page also has one fixed population: all works listing the author, any scope, full corpus.
+    if (authorPage()) Object.assign(filter, { scope: 'all', corpus: 'all' });
     if (currentModule !== 'publications' && !journalPage()) { delete filter.metricKind; delete filter.metricPart; }
 }
 function task(action, options = {}) {
@@ -166,9 +172,9 @@ function syncFilters() {
     }
     $('active-filters').replaceChildren();
     const labels = { topic: 'Topic', author: 'Author', partner: 'Partner', country: 'Country', funder: 'Funder', award: 'Award', source: 'Source', sdg: 'SDG', design: 'Study design', language: 'Language', license: 'License', version: 'Version', locationType: 'Location', local: `${home()} affiliation`, bin: 'Citation range', audit: 'Audit', metric: 'Indicator', dateQuality: 'Timeline-eligible date', fwciQuality: 'FWCI eligibility', q: 'Search' };
-    $('filter-scope').disabled = $('filter-corpus').disabled = journalPage();
+    $('filter-scope').disabled = $('filter-corpus').disabled = journalPage() || authorPage();
     for (const [key, label] of Object.entries(labels))
-        if (filter[key] !== undefined && filter[key] !== '' && !(key === 'source' && journalPage())) {
+        if (filter[key] !== undefined && filter[key] !== '' && !(key === 'source' && journalPage()) && !(key === 'author' && authorPage())) {
             const chip = el('span', { class: 'chip' }, `${label}: ${filter[key]}`), button = el('button', { type: 'button', 'aria-label': `Remove filter ${label}` }, '×');
             button.onclick = () => { const next = { ...filter }; delete next[key]; setHash(currentModule, next); };
             chip.append(button);
@@ -456,19 +462,25 @@ function render() {
     document.title = `${title} · ${INSTITUTION.name}`;
     document.querySelectorAll('.nav-link').forEach(a => { const active = a.dataset.module === currentModule; a.classList.toggle('active', active); active ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'); });
     syncFilters();
-    const journal = currentJournal();
+    const journal = currentJournal(), author = authorPage() ? data.author_profile : null;
+    if (author) {
+        $('page-title').textContent = author.name;
+        $('page-description').textContent = `Publication profile in the ${home()} research dashboard.`;
+        document.title = `${author.name} · Authors · ${INSTITUTION.name}`;
+        renderAuthorHeader(content, author, home(), () => setHash('authors', {}));
+    }
     if (journal) {
         document.title = `${journal.name} · Journals · ${INSTITUTION.name}`;
         renderJournalHeader(content, journalDataset, journal, () => setHash('journals', { metricYear: filter.metricYear }));
     }
     const scope = el('div', { class: 'scope-line' });
-    scope.append(el('span', {}, `${journal ? journal.name : scopeName[filter.scope]} · ${periodLabel()} · ${corpusName(filter.corpus)}`), el('strong', {}, `${num(data.total)} unique works`));
+    scope.append(el('span', {}, `${journal ? journal.name : author ? `Works of ${author.name}` : scopeName[filter.scope]} · ${periodLabel()} · ${corpusName(filter.corpus)}`), el('strong', {}, `${num(data.total)} unique works`));
     content.append(scope);
     if ((!filter.from || Number(filter.from) <= data.current_year) && (!filter.to || Number(filter.to) >= data.current_year))
         intro(content, `${data.current_year} is not complete yet. The year in progress is not compared as if it were a full calendar year.`);
-    if (filter.scope === 'all' && !journal)
+    if (filter.scope === 'all' && !journal && !author)
         intro(content, `The All scope combines the works affiliated with ${home()}${hasScope('funded') ? `, funded by ${home()}` : ''}${hasScope('published') ? ` and published by ${home()}` : ''}; each work counts once. Some works have no ${home()} author, so these numbers do not measure ${home()} research output alone.`);
-    else if (filter.scope !== 'affiliated' && !journal)
+    else if (filter.scope !== 'affiliated' && !journal && !author)
         intro(content, filter.scope === 'funded' ? `This scope holds works that list ${home()} as a funder. Authors may be affiliated with other institutions.` : `This scope holds works published by sources under ${home()} as publisher, including articles by authors outside ${home()}.`);
     kpis(content);
     if (currentModule === 'journals' && !journal)
@@ -488,7 +500,7 @@ function render() {
                 : setHash('publications', { ...withoutPeriod(filter), ...metricDrill(metric, kind, part) }) });
     }
     if (filter.metricKind) metricContext(content, journal);
-    if (!journal) selectors(content);
+    if (!journal && !author) selectors(content);
     const grid = el('div', { class: 'charts-grid' });
     content.append(grid);
     const k = data.kpis;
@@ -514,11 +526,34 @@ function render() {
         groupBar(grid, 'Metadata language', 'languages', 'language', 'Language of the title or abstract, not necessarily of the full text.');
         annualFWCITable(content, annual);
     }
+    else if (author) {
+        // Two per row, every chart on this author's works only; clicks narrow this page.
+        line(panel(grid, 'Publications over time', 'The author\'s works by publication year. Click a year to narrow this page.'), data.top.years, { onClick: drillYear });
+        line(panel(grid, 'Citations by year received', 'Citations to the author\'s works in each year (OpenAlex counts_by_year); the available window is limited.'), data.citation_years.map(([year, count]) => ({ year, count })), { label: 'Citations', unit: 'citations' });
+        stacked(panel(grid, 'Work types by year', 'Minor types may fall outside the top six series.'), groupedYears('types'), data.top.types.slice(0, 6), { onClick: (y, s) => drill({ from: y.year, to: y.year, type: s.id }) });
+        bar(panel(grid, 'Citation distribution', 'Number of works per citation range. Click a range to see its works.'), data.histogram, { horizontal: false, onClick: r => drill({ bin: r.id }) });
+        groupBar(grid, 'Top publication sources', 'sources', 'source');
+        groupBar(grid, 'Metadata language', 'languages', 'language', 'Language of the title or abstract, not necessarily of the full text.');
+        sdgCard(grid, 'SDGs of the author\'s works');
+        donut(panel(grid, 'Open access routes', 'OA status of the author\'s works at the snapshot date.'), data.top.oa, r => drill({ oa: r.id === 'unknown' ? '' : r.id }));
+        treemap(panel(grid, 'Research fields', 'One main field per work; click a field to narrow this page.'), data.top.fields, r => drill({ field: r.id }));
+        groupBar(grid, 'Leading topics', 'topics', 'topic', 'One work can belong to several topics.');
+        groupBar(grid, 'Co-authors\' institutions', 'partners', 'partner', `Institutions other than ${home()} on the author's works.`);
+        const fwciYears = data.annual_fwci.filter(r => r.count > 0);
+        const fwciPanel = panel(grid, 'Mean FWCI by publication year', 'Mean of valid FWCI scores of the author\'s works per publication year; dashed line: global benchmark 1. Years with few works are volatile.');
+        line(fwciPanel, fwciYears.map(r => ({ year: r.year, value: r.fwci, n: r.fwci_n })), { value: 'value', label: 'Mean FWCI', unit: 'FWCI', reference: 1, referenceLabel: 'Global benchmark FWCI 1', color: PALETTE[3],
+            tooltip: r => `${r.year}: mean FWCI ${r.value === null ? 'not available' : decimal(r.value)} · ${num(r.n)} works with FWCI${r.n < 5 ? ' · small base' : ''}`, onClick: drillYear });
+        fwciHelp(fwciPanel.node);
+        minis(content, [['h-index here', num(k.h_index), 'Within the works on this page'], ['Median citations', decimal(k.median_citations), 'Per work'], ['Works cited', pct(k.cited_share), 'At least one citation'], ['FWCI coverage', pct(k.fwci_coverage), 'Works with a valid FWCI']]);
+        collaborationMap(grid, { title: 'Collaboration countries', includeHome: true, unit: 'works',
+            note: `Affiliation countries of all authors on these works, including ${homeCountry()}. Bubble area is proportional to the number of works; one work can count for several countries.` });
+    }
     else if (currentModule === 'authors') {
         intro(content, `Every statistic in the author charts counts authorships that, on the same authorship element, are affiliated with ${home()}. Career statistics are shown separately in the details.`);
-        groupBar(grid, `Authors by works affiliated with ${home()}`, 'authors', 'author');
-        scatter(panel(grid, 'Author productivity and citations', 'At most the 50 most productive authors in the active filter.'), data.top.authors, { onClick: r => drill({ author: r.id }) });
-        smallMultiples(panel(grid, 'Author activity across years', `Line charts for the top 10 authors by works affiliated with ${home()}. Each author's range starts and ends at their publication years within the selected chart range; gaps in between stay at zero. The vertical scale is shared; horizontal ranges may differ. Click a point to explore the works.`, true), data.top.authors, years(), (r, y) => drill({ author: r.id, from: y, to: y }), { individual: true });
+        const authorBars = panel(grid, `Authors by works affiliated with ${home()}`, 'Click an author to open their profile.');
+        bar(authorBars, data.top.authors, { limit: 10, onClick: r => openAuthor(r.id) });
+        scatter(panel(grid, 'Author productivity and citations', 'At most the 50 most productive authors in the active filter. Click an author to open their profile.'), data.top.authors, { onClick: r => openAuthor(r.id) });
+        smallMultiples(panel(grid, 'Author activity across years', `Line charts for the top 10 authors by works affiliated with ${home()}. Each author's range starts and ends at their publication years within the selected chart range; gaps in between stay at zero. The vertical scale is shared; horizontal ranges may differ. Click a point to open that author's profile for the year.`, true), data.top.authors, years(), (r, y) => openAuthor(r.id, { from: y, to: y }), { individual: true });
         minis(content, [['Authors observed', num(k.authors), 'Profiles based on publications'], ['With ORCID', num(data.coverage.orcid_authors), 'Of the observed author profiles'], [`${home()} first authors`, num(k.first), 'Per work; same authorship element'], [`${home()} corresponding`, num(k.corresponding), 'Corresponding data is not guaranteed complete']]);
         entityTable(content, 'authors');
         intro(content,`${num(data.quality.author_id)} works have authorships without an OpenAlex author ID. Their available names, affiliations and positions are still shown; these authorships are not merged into one author profile or counted as new staff.`);
@@ -595,10 +630,8 @@ function render() {
         line(panel(grid, 'Journal publications over time', 'Journal works by publication year. Click a year to narrow this page.'), data.top.years, { onClick: drillYear });
         stacked(panel(grid, 'Work types by year', 'Unique works of this journal; minor types may fall outside the top six series.'), groupedYears('types'), data.top.types.slice(0, 6), { onClick: (y, s) => drill({ from: y.year, to: y.year, type: s.id }) });
         stacked(panel(grid, 'Access composition by year', 'Share of OA status for this journal\'s works per year.'), data.oa_years.map(y => ({ ...y, values: y.oa })), data.top.oa, { percentage: true, onClick: (y, s) => drill({ from: y.year, to: y.year, oa: s.id }) });
-        // SDG card beside author affiliation (as in the OJS widget): top 8 goals, the rest named in the note.
-        const goals = data.top.sdgs.filter(r => r.count > 0), others = goals.slice(8);
-        bar(panel(grid, 'SDGs of journal works', `Unique works per goal; one work can belong to several goals. Automatic OpenAlex classification, not a measure of impact.${others.length ? ` Other goals: ${others.map(r => `SDG ${r.id} (${num(r.count)})`).join(', ')}.` : ''} Click a goal to narrow this page.`),
-            goals, { limit: 8, onClick: r => drill({ sdg: r.id }) });
+        // SDG card beside author affiliation (as in the OJS widget).
+        sdgCard(grid, 'SDGs of journal works');
         const own = data.top.journals.find(r => r.id === journal.id) || { count: 0, local: 0 };
         donut(panel(grid, 'Author affiliation origin', `This journal's works with at least one ${home()} authorship versus works without a ${home()} affiliation.`),
             data.total ? [{ id: 'yes', name: `With ${home()} affiliation`, count: own.local }, { id: 'no', name: `Without ${home()} affiliation`, count: own.count - own.local }] : [], r => drill({ local: r.id }));
@@ -636,7 +669,13 @@ function render() {
     }
     if (!data.total)
         intro(content, 'No works match this combination of filters. Change the period or remove extra filters to widen the search.');
-    if (currentModule === 'publications' || journal) pubTable(content);
+    if (currentModule === 'publications' || journal || author) pubTable(content);
+}
+// SDG card shared by journal and author pages: top 8 goals in the chart, the rest named in the note.
+function sdgCard(grid, title) {
+    const goals = data.top.sdgs.filter(r => r.count > 0), others = goals.slice(8);
+    bar(panel(grid, title, `Unique works per goal; one work can belong to several goals. Automatic OpenAlex classification, not a measure of impact.${others.length ? ` Other goals: ${others.map(r => `SDG ${r.id} (${num(r.count)})`).join(', ')}.` : ''} Click a goal to narrow this page.`),
+        goals, { limit: 8, onClick: r => drill({ sdg: r.id }) });
 }
 function timelineTrack(p, label) {
     const controls = el('div', { class: 'timeline-controls' });
@@ -829,7 +868,7 @@ function entityTable(container, kind) {
             body.replaceChildren();
             for (const row of result.rows) {
                 const item = el('tr'), name = el('td'), button = el('button', { class: 'work-title', type: 'button' }, row.name);
-                button.onclick = () => drill({ [config.key]: row.id });
+                button.onclick = () => kind === 'authors' ? openAuthor(row.id) : drill({ [config.key]: row.id });
                 name.append(button);
                 item.append(el('td', { class: 'num' }, num(row.rank)), name);
                 for (const value of config.values(row)) item.append(el('td', {}, value));
@@ -1022,7 +1061,14 @@ async function openWork(id) {
         panel.append(el('h3', {}, `Authors and ${home()} affiliation`));
         const authors = el('ul', { class: 'detail-list' });
         for (const a of w.author_names) {
-            const li = el('li', {}, `${a.name || a.id}${a.home ? ' · ' + home() : ''}${a.position === 'first' ? ' · first author' : ''}${a.corresponding ? ' · corresponding' : ''}`);
+            const roles = `${a.home ? ' · ' + home() : ''}${a.position === 'first' ? ' · first author' : ''}${a.corresponding ? ' · corresponding' : ''}`;
+            const li = el('li', {}, a.id && a.home ? roles : `${a.name || a.id}${roles}`);
+            // Authors with an ID and an affiliated authorship link to their profile page.
+            if (a.id && a.home) {
+                const open = el('button', { type: 'button', class: 'author-link', 'data-author-profile': a.id, title: 'Open author profile' }, a.name || a.id);
+                open.onclick = () => { $('detail-dialog').close(); openAuthor(a.id); };
+                li.prepend(open);
+            }
             if (a.orcid) {
                 li.append(document.createTextNode(' · '), external('ORCID ↗', a.orcid));
             }
@@ -1105,6 +1151,17 @@ async function route() {
         const result = await getSummary();
         if (thisRender !== renderID)
             return;
+        // A profile exists only for authors with an affiliated authorship somewhere in the snapshot.
+        if (authorPage() && !filter.from && !result.author_profile?.eligible) {
+            destroyCharts();
+            const box = el('div', { class: 'empty-state' }), go = el('button', { type: 'button', class: 'button secondary' }, 'Show this author\'s works in Publications');
+            go.onclick = () => setHash('publications', { author: filter.author, scope: 'all', corpus: 'all' });
+            box.append(el('p', {}, `No profile: author ${filter.author} has no ${home()}-affiliated work in this snapshot.`), go);
+            $('content').replaceChildren(box);
+            $('content').setAttribute('aria-busy', 'false');
+            note('');
+            return;
+        }
         data = result;
         render();
         note('');
@@ -1177,7 +1234,7 @@ async function init() {
         topicSubfield = '';
         if (!manifest) return;
         const previousHash = location.hash;
-        setHash(currentModule, journalPage() ? { journal: filter.journal } : moduleDefaults(currentModule));
+        setHash(currentModule, journalPage() ? { journal: filter.journal } : authorPage() ? { author: filter.author } : moduleDefaults(currentModule));
         if (location.hash === previousHash) route();
     };
     $('menu-toggle').onclick = () => { const active = document.querySelector('.sidebar').classList.toggle('open'); $('menu-toggle').setAttribute('aria-expanded', String(active)); };

@@ -213,6 +213,31 @@ export function renderJournalHeader(container, dataset, journal, onBack) {
     container.append(header);
     return header;
 }
+// Author profile header: identity, roles on the works in this dashboard, and OpenAlex career figures kept apart.
+export function renderAuthorHeader(container, author, home, onBack) {
+    // The page title already shows the author's name, so the header starts with identity links.
+    const header = el('section', { class: 'journal-page-head author-page-head', 'data-author-page': author.id }), back = el('button', { class: 'button secondary', type: 'button' }, `← All ${home} authors`);
+    back.onclick = onBack;
+    const facts = el('dl', { class: 'journal-counts author-facts' });
+    const span = author.first_year === null ? 'Not available' : author.first_year === author.last_year ? String(author.first_year) : `${author.first_year}–${author.last_year}`;
+    for (const [label, value] of [['Works in this dashboard', count(author.works)], [`With ${home} affiliation`, count(author.home_works)], ['Publication years', span],
+        ['First author', count(author.first_author)], ['Last author', count(author.last_author)], ['Corresponding author', count(author.corresponding)]])
+        facts.append(el('dt', {}, label), el('dd', {}, value));
+    const career = el('dl', { class: 'journal-counts author-facts' }), c = author.career;
+    const value = n => n === null || n === undefined ? 'Not available' : count(n);
+    for (const [label, n] of [['Works', c.works], ['Citations', c.citations], ['h-index', c.h_index], ['i10-index', c.i10_index]]) career.append(el('dt', {}, label), el('dd', {}, value(n)));
+    const identity = el('p', { class: 'panel-note' }, `OpenAlex author ${author.id}`);
+    if (author.orcid) identity.append(document.createTextNode(' · '), link('ORCID ↗', author.orcid));
+    identity.append(document.createTextNode(' · '), link('OpenAlex profile ↗', 'https://openalex.org/' + author.id));
+    const grid = el('div', { class: 'author-head-grid' }), left = el('div'), right = el('div');
+    left.append(el('h3', {}, 'In this dashboard'), facts);
+    right.append(el('h3', {}, 'OpenAlex career, all affiliations'), career);
+    grid.append(left, right);
+    header.append(back, identity, grid,
+        el('p', { class: 'panel-note' }, `KPIs, charts and the list below cover every work in this dashboard that lists this author, including works in ${home} journals under another affiliation; filters narrow them. Career figures come from the author's OpenAlex profile and include work outside this dashboard. Author identities come from OpenAlex disambiguation and can be imperfect; this is not an official performance assessment.`));
+    container.append(header);
+    return header;
+}
 export function renderJournalMetrics(container, dataset, journal, filter, { onYear, onDrill }) {
     const year = metricYear(dataset.years, dataset.defaults.year, filter);
     return renderImpactMetrics(container, journal.series, {

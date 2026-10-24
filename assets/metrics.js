@@ -215,6 +215,21 @@ export function journalWidgetData(journal, works, entities, manifest, dataset) {
         sdgs: summary.top.sdgs.filter(r => /^(?:[1-9]|1[0-7])$/.test(r.id)).map(r => [Number(r.id), r.count]),
         sdg_policy: { classifier: manifest.sdg?.classifier || 'unknown', scores: Boolean(manifest.sdg?.scores) } };
 }
+// One author's identity (OpenAlex profile, all affiliations) and roles on the given works.
+// eligible: the author has an affiliated authorship anywhere in the snapshot (all works), whatever the active filter.
+export function authorProfile(works, entities, id, everything = works) {
+    const entity = entities.authors[id] || {}, own = works.map(w => w.authors.filter(a => a.id === id)).filter(list => list.length);
+    const years = works.map(w => w.year).filter(Number.isInteger);
+    return { id, name: entity.name || id, orcid: entity.orcid || null, works: own.length,
+        eligible: everything.some(w => w.authors.some(a => a.id === id && a.home)),
+        home_works: own.filter(list => list.some(a => a.home)).length,
+        first_author: own.filter(list => list.some(a => a.position === 'first')).length,
+        last_author: own.filter(list => list.some(a => a.position === 'last')).length,
+        corresponding: own.filter(list => list.some(a => a.corresponding)).length,
+        first_year: years.length ? Math.min(...years) : null, last_year: years.length ? Math.max(...years) : null,
+        career: { works: entity.career_works ?? null, citations: entity.career_citations ?? null,
+            h_index: entity.career_stats?.h_index ?? null, i10_index: entity.career_stats?.i10_index ?? null } };
+}
 // Recap across all mapped journals: an unweighted mean of journal values plus a pooled ratio of summed parts.
 export function journalRecap(dataset, year) {
     const result = { year, journals: dataset.journals.length };
@@ -653,6 +668,8 @@ export function summarize(works, entities, filter, manifest, history = [], table
         facets: { fields: [...fields].map(([id, name]) => ({ id, name })), topics: allTopics,
             types: sorted('types').map(({ id, name }) => ({ id, name })) },
         history: history.slice(-12), current_year: currentYear,
+        // Author profile page: identity and the author's own authorship roles within the selected works.
+        ...(filter.author ? { author_profile: authorProfile(selected, entities, filter.author, works) } : {}),
         citation_ratios: ratios ? institutionCitationMetrics(works, entities, filter, currentYear) : null,
         // A citation-ratio drill reports the numerator/denominator of the same filter it lists.
         metric_row: filter.metricKind && !filter.journal && filter.metricKind !== 'fwci'
